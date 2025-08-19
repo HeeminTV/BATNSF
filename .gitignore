@@ -1,0 +1,6 @@
+BINREADWRITE/.vs
+BINREADWRITE/*.sln
+BINREADWRITE/*.vcxproj
+BINREADWRITE/*.vcxproj.filters
+BINREADWRITE/*.vcxproj.user
+ignore
