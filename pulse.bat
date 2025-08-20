@@ -1,6 +1,23 @@
 @ECHO OFF
 SETLOCAL ENABLEDELAYEDEXPANSION
 
+:: LICENCE TEXT ::
+
+:: Copyright (C) 2025 Heemin
+
+:: This program is free software; you can redistribute it and/or
+:: modify it under the terms of the GNU General Public License
+:: as published by the Free Software Foundation; either version 2
+:: of the License, or (at your option) any later version.
+
+:: This program is distributed in the hope that it will be useful,
+:: but WITHOUT ANY WARRANTY; without even the implied warranty of
+:: MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+:: GNU General Public License for more details.
+
+:: You should have received a copy of the GNU General Public License
+:: along with this program; if not, see <https://www.gnu.org/licenses/>.
+
 SET "BN_RENDERSAMPLES=0"
 
 SET "BN_VGMPATH=%~1"
@@ -9,14 +26,17 @@ SET /A "BN_REG0=BN_PREGOFFSET + 0"
 REM SET /A "BN_REG1=BN_PREGOFFSET + 1"
 SET /A "BN_REG2=BN_PREGOFFSET + 2"
 SET /A "BN_REG3=BN_PREGOFFSET + 3"
+
 SET "BN_POINTER=%~3"
+
+SET "BN_GAIN=3"
 
 SET "BN_WAVE_P0=128"
 SET "BN_WAVE_P1=192"
 SET "BN_WAVE_P2=240"
 SET "BN_WAVE_P3=252"
 
-SET "BN_CHSTAT_PULSE_DUNTIL=1"
+SET "BN_CHSTAT_PULSE_PERIOD=0"
 SET "BN_CHSTAT_PULSE_PHASE=0"
 
 SET "BN_CHREG_PULSE_DUTY=0"
@@ -26,7 +46,7 @@ set "BN_CHREG_PULSE_CV=1"
 SET "BN_CHREG_PULSE_PL=0"
 SET "BN_CHREG_PULSE_PH=0"
 REM SET "BN_CHREG_PULSE_LEN=0"
-REM TODO : LENGTH COUNTER, SWEEP UNITS
+REM TODO : LENGTH COUNTER, ENVELOPE SWEEP UNITS
 
 REM TODO : DETECT JUMP / EOF POINT
 :A
@@ -43,13 +63,15 @@ IF !BN_COMMAND! EQU 180 (
 			SET /A "BN_CHREG_PULSE_ENVMODE=(%%B >> 5) & 1"
 			SET /A "BN_CHREG_PULSE_CV=(%%B >> 4) & 1"
 			SET /A "BN_CHREG_PULSE_VOL=%%B & 0x0F"
+			ECHO $4000 WRITE : %%B
 			
 		) ELSE IF %%A EQU !BN_REG2! (
 			SET "BN_CHREG_PULSE_PL=%%B"
+			ECHO $4002 WRITE : %%B
 			
 		) ELSE IF %%A EQU !BN_REG3! (
 			SET /A "BN_CHREG_PULSE_PH=%%B & 0x07"
-		
+			ECHO $4003 WRITE : %%B
 		)
 	)
 	SET /A "BN_POINTER+=2"
@@ -71,26 +93,24 @@ IF !BN_COMMAND! EQU 180 (
 	ECHO UNKNOWN COMMAND : !BN_COMMAND!
 )
 
-IF !BN_RENDERSAMPLES! NEQ 0 (
-	SET /A "BN_CHSTAT_PULSE_PERIOD=(BN_CHREG_PULSE_PH << 8) | BN_CHREG_PULSE_PL"
-	CALL :RENDER
-)
+IF !BN_RENDERSAMPLES! NEQ 0 CALL :RENDER
+
 GOTO A
 
 :RENDER
 FOR /L %%A IN (1, 1, !BN_RENDERSAMPLES!) DO (
 	FOR /L %%B IN (1, 1, 20) DO (
-		IF !BN_CHSTAT_PULSE_DUNTIL! LEQ !BN_CHSTAT_PULSE_PERIOD! (
-			SET /A "BN_CHSTAT_PULSE_DUNTIL+=1"
-		) ELSE (
-			SET "BN_CHSTAT_PULSE_DUNTIL=1"
+		IF !BN_CHSTAT_PULSE_PERIOD! EQU 0 (
+			SET /A "BN_CHSTAT_PULSE_PERIOD=(BN_CHREG_PULSE_PH << 8) | BN_CHREG_PULSE_PL"
 			SET /A "BN_CHSTAT_PULSE_PHASE+=1"
 		)
 		
-		SET /A "TEMPVARI01=7 - (BN_CHSTAT_PULSE_PHASE & 0x07)"
-		SET /A "TEMPVARI01=((BN_WAVE_P!BN_CHREG_PULSE_DUTY! >> TEMPVARI01) & 1) * BN_CHREG_PULSE_VOL * 3"
+		SET /A "BN_CHSTAT_PULSE_VOL=BN_CHREG_PULSE_VOL"
 		
+		SET /A "TEMPVARI01=((BN_WAVE_P!BN_CHREG_PULSE_DUTY! >> (BN_CHSTAT_PULSE_PHASE & 0x07)) & 1) * BN_CHSTAT_PULSE_VOL * BN_GAIN"
 	)
 	BINREADWRITE.EXE TEST.RAW WRITE DEC !TEMPVARI01!
+	
+	ECHO wave phase : !BN_CHSTAT_PULSE_PHASE!, actual volume : !BN_CHSTAT_PULSE_VOL!, period low : !BN_CHREG_PULSE_PL!
 )
 GOTO :EOF
