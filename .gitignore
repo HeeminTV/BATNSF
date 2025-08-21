@@ -4,3 +4,4 @@ BINREADWRITE/*.vcxproj
 BINREADWRITE/*.vcxproj.filters
 BINREADWRITE/*.vcxproj.user
 ignore
+picobat-224.04
